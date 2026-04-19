@@ -1352,84 +1352,90 @@ function MainApp() {
             <input type="password" value={api.elevenLabsKey} placeholder="sk_..." onChange={e=>setApi(c=>({...c,elevenLabsKey:e.target.value}))} style={{width:"100%",boxSizing:"border-box"}}/>
             <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:4}}>Get your key at elevenlabs.io → Profile → API Key. Leave blank to disable voice.</div>
           </div>
-          <div style={{fontSize:12,color:"var(--color-text-secondary)",marginTop:8}}>API credentials provided at Saturday 3:30 PM workshop. Leave blank for demo mode.</div>
         </div>
       )}
 
       {/* ── Nav ── */}
-      <div style={{
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  marginBottom: "1.5rem",
-  position: "relative"
-}}>
+    
 
   {/* Progress line */}
   <div style={{
-    position: "absolute",
-    top: "50%",
-    left: 0,
-    right: 0,
-    height: 2,
-    background: "rgba(255,255,255,0.1)",
-    transform: "translateY(-50%)",
-    zIndex: 0
-  }} />
+  display: "flex",
+  alignItems: "center",
+  marginBottom: "1.5rem"
+}}>
 
   {TABS.map((t, i) => {
     const active = screen === t.id;
 
     return (
-      <div
-        key={t.id}
-        onClick={() => !t.locked && setScreen(t.id)}
-        style={{
-          zIndex: 1,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          cursor: t.locked ? "not-allowed" : "pointer",
-          flex: 1,
-          transition: "all 0.3s ease"
-        }}
-      >
-        {/* Circle */}
-        <div style={{
-          width: 38,
-          height: 38,
-          borderRadius: "50%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 13,
-          fontWeight: 600,
-          color: active ? "#020617" : "#94a3b8",
-          background: active
-            ? "linear-gradient(135deg,#22d3ee,#8b5cf6)"
-            : "rgba(255,255,255,0.05)",
-          boxShadow: active
-            ? "0 0 20px rgba(139,92,246,0.6)"
-            : "none",
-          border: active
-            ? "none"
-            : "1px solid rgba(255,255,255,0.1)",
-          transition: "all 0.3s ease"
-        }}>
-          {i}
+      <div key={t.id} style={{
+        display: "flex",
+        alignItems: "center",
+        flex: 1
+      }}>
+
+        {/* STEP */}
+        <div
+          onClick={() => !t.locked && setScreen(t.id)}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            cursor: t.locked ? "not-allowed" : "pointer",
+            flexShrink: 0
+          }}
+        >
+          <div style={{
+            width: 42,
+            height: 42,
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 14,
+            fontWeight: 700,
+            color: active ? "#020617" : "#94a3b8",
+            background: active
+              ? "linear-gradient(135deg,#22d3ee,#8b5cf6)"
+              : "rgba(255,255,255,0.05)",
+            boxShadow: active
+              ? "0 0 25px rgba(139,92,246,0.7)"
+              : "none",
+            border: active
+              ? "none"
+              : "1px solid rgba(255,255,255,0.1)",
+            transition: "all 0.3s ease"
+          }}>
+            {i}
+          </div>
+
+          <div style={{
+            marginTop: 6,
+            fontSize: 11,
+            color: active ? "#fff" : "#64748b"
+          }}>
+            {t.label.split(" ")[1]}
+          </div>
         </div>
 
-        {/* Label */}
-        <div style={{
-          marginTop: 6,
-          fontSize: 11,
-          color: active ? "#fff" : "#64748b",
-          fontWeight: active ? 600 : 400,
-          textAlign: "center",
-          transition: "all 0.3s"
-        }}>
-          {t.label.split(" ")[1]}
-        </div>
+        {/* ARROW ONLY (NO LINE) */}
+        {i < TABS.length - 1 && (
+          <div style={{
+            flex: 1,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center"
+          }}>
+            <span style={{
+              fontSize: 18,
+              color: "rgba(255,255,255,0.3)",
+              margin: "0 10px"
+            }}>
+              →
+            </span>
+          </div>
+        )}
       </div>
     );
   })}
@@ -2090,9 +2096,40 @@ export default function App() {
     <Landing onEnter={() => setView("app")} />
   ) : (
     <>
-      <button className="back-home-btn" onClick={() => setView("landing")}>
-        ← Back to Landing
-      </button>
+      <button
+  onClick={() => setView("landing")}
+  style={{
+    position: "fixed",
+    top: 20,
+    left: 20,
+    zIndex: 1000,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "10px 14px",
+    borderRadius: "14px",
+    border: "1px solid rgba(255,255,255,0.15)",
+    background: "rgba(15,23,42,0.6)",
+    backdropFilter: "blur(10px)",
+    color: "#e2e8f0",
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: "pointer",
+    transition: "all 0.25s ease",
+  }}
+  onMouseEnter={(e) => {
+    e.currentTarget.style.background = "linear-gradient(135deg,#22d3ee,#8b5cf6)";
+    e.currentTarget.style.color = "#fff";
+    e.currentTarget.style.boxShadow = "0 0 20px rgba(139,92,246,0.6)";
+  }}
+  onMouseLeave={(e) => {
+    e.currentTarget.style.background = "rgba(15,23,42,0.6)";
+    e.currentTarget.style.color = "#e2e8f0";
+    e.currentTarget.style.boxShadow = "none";
+  }}
+>
+  🏠 Home
+</button>
       <MainApp />
     </>
   );
