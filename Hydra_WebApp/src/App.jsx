@@ -1063,6 +1063,7 @@ function normalizeProtocol(p = {}) {
 }
 // ─── APP ──────────────────────────────────────────────────────────────────────
 function MainApp() {
+const reportRef = useRef(null);
 const [uploadedData, setUploadedData] = useState(null);
 const [reportPreview, setReportPreview] = useState(null);
 const [reportErr, setReportErr] = useState("");
@@ -1466,7 +1467,42 @@ const uploadRef = useRef(null);
 
   reader.readAsText(file);
 };
+const downloadReportPdf = async () => {
+  if (!reportRef.current) return;
 
+  const html2canvas = (await import("html2canvas")).default;
+  const { jsPDF } = await import("jspdf");
+
+  const canvas = await html2canvas(reportRef.current, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: "#020617",
+  });
+
+  const imgData = canvas.toDataURL("image/png");
+  const pdf = new jsPDF("p", "mm", "a4");
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+
+  const imgWidth = pageWidth;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+  let heightLeft = imgHeight;
+  let position = 0;
+
+  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
+
+  while (heightLeft > 0) {
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+
+  pdf.save(`${reportPreview?.patientName || "Hydrawav3"}-report.pdf`);
+};
 const generateReport = () => {
   const report = {
     patientName: pt.name || uploadedData?.patient?.name || "Unknown",
@@ -1500,6 +1536,7 @@ const generateReport = () => {
   setReportPreview(report);
   setScreen("report");
 };
+
   return (
     <div style={C.root}>
 
@@ -1511,6 +1548,127 @@ const generateReport = () => {
         </div>
         <button style={C.ghost} onClick={()=>setShowCfg(v=>!v)}>{showCfg?"Close":"Settings"}</button>
       </div>
+      {screen === "report" && reportPreview && (
+  <div>
+    <div style={{ marginBottom: "1.5rem" }}>
+      <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 4 }}>
+        Final Report
+      </div>
+      <div style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>
+        Live data + manual upload merged into one clinical-style summary
+      </div>
+    </div>
+
+    <div
+      ref={reportRef}
+      style={{
+        background: "linear-gradient(180deg, rgba(15,23,42,0.95), rgba(2,6,23,0.98))",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 24,
+        padding: 24,
+        boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 12, letterSpacing: "0.12em", color: "#94a3b8", marginBottom: 8 }}>
+            HYDRAWAV3 REPORT
+          </div>
+          <div style={{ fontSize: 30, fontWeight: 700, color: "#fff" }}>
+            {reportPreview.patientName}
+          </div>
+          <div style={{ fontSize: 14, color: "#cbd5e1", marginTop: 4 }}>
+            Age {reportPreview.age} · Recovery Intelligence Summary
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button style={C.ghost} onClick={() => setScreen("recovery")}>
+            Back
+          </button>
+          <button style={C.prim} onClick={downloadReportPdf}>
+            Download PDF
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+        <div style={reportCardStyle}>
+          <div style={reportLabelStyle}>Goal</div>
+          <div style={reportValueStyle}>{reportPreview.merged.protocol.goal}</div>
+        </div>
+        <div style={reportCardStyle}>
+          <div style={reportLabelStyle}>Intensity</div>
+          <div style={reportValueStyle}>{reportPreview.merged.protocol.intensity}</div>
+        </div>
+        <div style={reportCardStyle}>
+          <div style={reportLabelStyle}>Duration</div>
+          <div style={reportValueStyle}>{reportPreview.merged.protocol.sessionDurationMinutes} min</div>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={sectionTitleStyle}>Summary</div>
+        <div style={sectionTextStyle}>{reportPreview.summary}</div>
+      </div>
+
+      <div style={{ ...sectionStyle, marginTop: 14 }}>
+        <div style={sectionTitleStyle}>Vitals</div>
+        <div style={sectionTextStyle}>
+          Heart Rate: {reportPreview.merged.vitals.heartRate} bpm ·
+          Breath Rate: {reportPreview.merged.vitals.breathRate} /min ·
+          HRV: {reportPreview.merged.vitals.hrv} ms
+        </div>
+      </div>
+
+      <div style={{ ...sectionStyle, marginTop: 14 }}>
+        <div style={sectionTitleStyle}>Protocol</div>
+        <div style={sectionTextStyle}>
+          Sun Pad: {reportPreview.merged.protocol.sunPadPlacement}<br />
+          Moon Pad: {reportPreview.merged.protocol.moonPadPlacement}
+        </div>
+      </div>
+
+      <div style={{ ...sectionStyle, marginTop: 14 }}>
+        <div style={sectionTitleStyle}>Recommendations</div>
+        <div style={sectionTextStyle}>
+          Coaching Tip: {reportPreview.recommendations.coachingTip}<br />
+          Retest: {reportPreview.recommendations.recoveryFocus}
+        </div>
+      </div>
+
+      {reportPreview.merged.uploadedData && (
+        <div style={{ ...sectionStyle, marginTop: 14 }}>
+          <div style={sectionTitleStyle}>Uploaded Dataset</div>
+          <pre style={{
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            fontSize: 12,
+            color: "#cbd5e1",
+            margin: 0,
+          }}>
+            {JSON.stringify(reportPreview.merged.uploadedData, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+
+    <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+      <button style={C.ghost} onClick={() => setScreen("recovery")}>
+        Back to Recovery
+      </button>
+      <button
+        style={C.prim}
+        onClick={() => {
+          setScreen("camera");
+          setReportPreview(null);
+        }}
+      >
+        New Session
+      </button>
+    </div>
+  </div>
+)}
 
       {/* ── Settings ── */}
       {showCfg&&(
@@ -2132,26 +2290,54 @@ const generateReport = () => {
   </div>
 )}
 
-<div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+{/* ACTION SECTION */}
+<div style={{
+  marginTop: 20,
+  display: "flex",
+  flexDirection: "column",
+  gap: 12
+}}>
+
+  {/* Upload + Generate row */}
+  <div style={{ display: "flex", gap: 10 }}>
+    <button
+      style={{ ...C.ghost, flex: 1 }}
+      onClick={() => uploadRef.current?.click()}
+    >
+      Upload Dataset JSON
+    </button>
+
+    <button
+      style={{ ...C.prim, flex: 1 }}
+      onClick={generateReport}
+    >
+      Generate Report ↗
+    </button>
+  </div>
+
+  {/* Divider */}
+  <div style={{
+    height: 1,
+    background: "rgba(255,255,255,0.08)",
+    margin: "10px 0"
+  }} />
+
+  {/* New Session */}
   <button
-    style={{ ...C.ghost, flex: 1 }}
-    onClick={() => uploadRef.current?.click()}
+    style={{ ...C.prim, width: "100%" }}
+    onClick={() => {
+      setScreen("camera");
+      setProto(null);
+      setAsmt(null);
+      setGotIt(false);
+      setReportPreview(null);
+    }}
   >
-    Upload Dataset JSON
+    New Client Session ↗
   </button>
 
-  <button
-    style={{ ...C.prim, flex: 1 }}
-    onClick={generateReport}
-  >
-    Generate Report
-  </button>
 </div>
-              <button style={C.prim} onClick={()=>{
-                setScreen("camera"); setProto(null); setAsmt(null); setGotIt(false);
-                setSess({status:"idle",elapsed:0,token:null,log:[]}); setRec({romBefore:"",romAfter:"",painBefore:5,painAfter:3,notes:""});
-                setScore(null); setLive(null); setLiveHR(null);
-              }}>New Client Session ↗</button>
+              
             </div>
           ):(
             <div style={C.card}>
