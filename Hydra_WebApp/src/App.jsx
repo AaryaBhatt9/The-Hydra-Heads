@@ -186,10 +186,31 @@ async function deviceLogin(url,user,pass) {
   const d=await r.json();
   return (d.JWT_ACCESS_TOKEN||"").replace("Bearer ","");
 }
-async function sendMQTT(url,token,payload) {
-  const r=await fetch(`${url}/api/v1/mqtt/publish`,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},body:JSON.stringify({topic:"HydraWav3Pro/config",payload:JSON.stringify(payload)})});
-  if(!r.ok) throw new Error(`MQTT failed (${r.status})`);
-  return r.json();
+async function sendMQTT(url, token, payload) {
+  const r = await fetch(`${url}/api/v1/mqtt/publish`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      topic: "HydraWav3Pro/config",
+      payload: JSON.stringify(payload)
+    })
+  });
+
+  if (!r.ok) {
+    const text = await r.text();
+    throw new Error(`MQTT failed: ${text}`);
+  }
+
+  // ✅ SAFE HANDLING (works for JSON OR text)
+  const text = await r.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text }; // fallback if not JSON
+  }
 }
 
 // ─── AI PROTOCOL GENERATION ───────────────────────────────────────────────────
@@ -1042,6 +1063,10 @@ function normalizeProtocol(p = {}) {
 }
 // ─── APP ──────────────────────────────────────────────────────────────────────
 function MainApp() {
+const [uploadedData, setUploadedData] = useState(null);
+const [reportPreview, setReportPreview] = useState(null);
+const [reportErr, setReportErr] = useState("");
+const uploadRef = useRef(null);
   const [sessionMode, setSessionMode] = useState("auto");
   const C = {
   root: {
@@ -1077,6 +1102,7 @@ function MainApp() {
     border: "1px solid rgba(255,255,255,0.08)",
     marginBottom: "20px",
   },
+  
 
   tab: (active) => ({
     flex: 1,
@@ -1417,6 +1443,63 @@ function MainApp() {
     {id:"recovery", label:"4  Learn",   locked:sess.status==="idle"},
   ];
 
+  const handleDatasetUpload = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(String(reader.result || "{}"));
+      setUploadedData(data);
+      setReportErr("");
+
+      // Optional: merge uploaded data into existing app state
+      if (data.patient) setPt(p => ({ ...p, ...data.patient }));
+      if (data.vitals) setVitals(v => ({ ...v, ...data.vitals }));
+      if (data.assessment) setAsmt(a => ({ ...(a || {}), ...data.assessment }));
+      if (data.protocol) setProto(p => normalizeProtocol({ ...(p || {}), ...data.protocol }));
+    } catch (err) {
+      setReportErr("Upload failed: please use valid JSON.");
+    }
+  };
+
+  reader.readAsText(file);
+};
+
+const generateReport = () => {
+  const report = {
+    patientName: pt.name || uploadedData?.patient?.name || "Unknown",
+    age: pt.age || uploadedData?.patient?.age || "n/a",
+    goal: proto?.goal || uploadedData?.protocol?.goal || "recovery",
+    intensity: proto?.intensity || uploadedData?.protocol?.intensity || "moderate",
+    duration: proto?.sessionDurationMinutes ?? uploadedData?.protocol?.sessionDurationMinutes ?? 9,
+    summary: [
+      asmt ? `Camera assessment collected with ${asmt.flags?.length || 0} flags.` : "No live camera assessment.",
+      vitals ? `Vitals: HR ${vitals.heartRate || "n/a"}, Breath ${vitals.breathRate || "n/a"}, HRV ${vitals.hrv || "n/a"}.` : "No live vitals captured.",
+      proto ? `Protocol generated with sun pad at ${proto.sunPadPlacement} and moon pad at ${proto.moonPadPlacement}.` : "No protocol generated yet.",
+      sess?.status ? `Session status: ${sess.status}.` : "",
+      rec?.notes ? `Practitioner notes: ${rec.notes}` : "",
+      uploadedData ? "Manual dataset upload included." : "",
+    ].filter(Boolean).join(" "),
+    recommendations: {
+      coachingTip: proto?.coachingTip || "Keep movement gentle between visits.",
+      recoveryFocus: proto?.recoveryFocus || "Re-test the main ROM area next visit.",
+    },
+    raw: {
+      patient: pt,
+      assessment: asmt,
+      vitals,
+      protocol: proto,
+      session: sess,
+      recovery: rec,
+      uploadedData,
+    },
+  };
+
+  setReportPreview(report);
+  setScreen("report");
+};
   return (
     <div style={C.root}>
 
@@ -2035,7 +2118,35 @@ function MainApp() {
                   ))}
                 </div>
               )}
+<input
+  ref={uploadRef}
+  type="file"
+  accept=".json,application/json"
+  style={{ display: "none" }}
+  onChange={handleDatasetUpload}
+/>
 
+{reportErr && (
+  <div style={{ color: "var(--color-text-danger)", fontSize: 13, marginBottom: 10 }}>
+    {reportErr}
+  </div>
+)}
+
+<div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+  <button
+    style={{ ...C.ghost, flex: 1 }}
+    onClick={() => uploadRef.current?.click()}
+  >
+    Upload Dataset JSON
+  </button>
+
+  <button
+    style={{ ...C.prim, flex: 1 }}
+    onClick={generateReport}
+  >
+    Generate Report
+  </button>
+</div>
               <button style={C.prim} onClick={()=>{
                 setScreen("camera"); setProto(null); setAsmt(null); setGotIt(false);
                 setSess({status:"idle",elapsed:0,token:null,log:[]}); setRec({romBefore:"",romAfter:"",painBefore:5,painAfter:3,notes:""});
