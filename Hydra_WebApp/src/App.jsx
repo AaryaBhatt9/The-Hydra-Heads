@@ -105,27 +105,77 @@ class RPPGEstimator {
 }
 
 // ─── MQTT SESSION CONFIG ───────────────────────────────────────────────────────
-function buildSessionConfig(mac, protocol) {
+function buildSessionConfig(mac, protocol, mode = "auto") {
+  // Special 10-min red + blue session
+  if (mode === "redBlue10") {
+    return {
+      mac,
+      sessionCount: 1,
+      sessionPause: 0,
+      sDelay: 0,
+      cycle1: 1,
+      cycle5: 1,
+      edgeCycleDuration: 10,
+      cycleRepetitions: [1],
+      cycleDurations: [600],
+      cyclePauses: [0],
+      pauseIntervals: [0],
+
+      leftFuncs: ["leftHotRed"],
+      rightFuncs: ["rightColdBlue"],
+
+      pwmValues: {
+        hot: [90, 90, 90],
+        cold: [220, 220, 220],
+      },
+
+      playCmd: 1,
+      led: 1,
+      hotDrop: 5,
+      coldDrop: 3,
+      vibMin: 15,
+      vibMax: 180,
+      totalDuration: 600,
+    };
+  }
+
+  // Your normal protocol logic
   const pwm = {
-    gentle:   {hot:[70,70,70],   cold:[180,180,180]},
-    moderate: {hot:[80,80,80],   cold:[220,220,220]},
-    intense:  {hot:[90,90,90],   cold:[250,250,250]},
-  }[protocol.intensity]||{hot:[80,80,80],cold:[220,220,220]};
+    gentle:   { hot: [70, 70, 70], cold: [180, 180, 180] },
+    moderate: { hot: [80, 80, 80], cold: [220, 220, 220] },
+    intense:  { hot: [90, 90, 90], cold: [250, 250, 250] },
+  }[protocol.intensity] || { hot: [80, 80, 80], cold: [220, 220, 220] };
+
   const vib = {
-    gentle:   {min:10,max:120},
-    moderate: {min:15,max:180},
-    intense:  {min:20,max:222},
-  }[protocol.intensity]||{min:15,max:180};
-  const act = protocol.goal==="activation";
+    gentle:   { min: 10, max: 120 },
+    moderate: { min: 15, max: 180 },
+    intense:  { min: 20, max: 222 },
+  }[protocol.intensity] || { min: 15, max: 180 };
+
+  const act = protocol.goal === "activation";
+
   return {
-    mac, sessionCount:3, sessionPause:30, sDelay:0,
-    cycle1:1, cycle5:1, edgeCycleDuration:9,
-    cycleRepetitions:[6,6,3], cycleDurations:[3,3,3],
-    cyclePauses:[3,3,3], pauseIntervals:[3,3,3],
-    leftFuncs:  act?["leftHotRed","leftColdBlue","leftHotRed"]   :["leftColdBlue","leftHotRed","leftColdBlue"],
-    rightFuncs: act?["rightColdBlue","rightHotRed","rightColdBlue"]:["rightHotRed","rightColdBlue","rightHotRed"],
-    pwmValues:pwm, playCmd:1, led:1, hotDrop:5, coldDrop:3,
-    vibMin:vib.min, vibMax:vib.max, totalDuration:426,
+    mac,
+    sessionCount: 3,
+    sessionPause: 30,
+    sDelay: 0,
+    cycle1: 1,
+    cycle5: 1,
+    edgeCycleDuration: 9,
+    cycleRepetitions: [6, 6, 3],
+    cycleDurations: [3, 3, 3],
+    cyclePauses: [3, 3, 3],
+    pauseIntervals: [3, 3, 3],
+    leftFuncs: act ? ["leftHotRed", "leftColdBlue", "leftHotRed"] : ["leftColdBlue", "leftHotRed", "leftColdBlue"],
+    rightFuncs: act ? ["rightColdBlue", "rightHotRed", "rightColdBlue"] : ["rightHotRed", "rightColdBlue", "rightHotRed"],
+    pwmValues: pwm,
+    playCmd: 1,
+    led: 1,
+    hotDrop: 5,
+    coldDrop: 3,
+    vibMin: vib.min,
+    vibMax: vib.max,
+    totalDuration: 426,
   };
 }
 
@@ -970,8 +1020,29 @@ const PTYPES=[{value:"physical_therapist",label:"Physical Therapist"},{value:"ch
 const CONCERNS=[{value:"muscle_tension",label:"Muscle Tension / Guarding"},{value:"recovery",label:"Post-Workout / Post-Adjustment Recovery"},{value:"activation",label:"Pre-Game Warmup / Activation"},{value:"chronic_discomfort",label:"Chronic Discomfort Support"},{value:"nervous_system",label:"Nervous System Reset"},{value:"mobility",label:"Mobility / Range of Motion"}];
 const TOTAL=540;
 
+function normalizeProtocol(p = {}) {
+  return {
+    sunPadPlacement: p.sunPadPlacement?.trim() || "Upper back",
+    moonPadPlacement: p.moonPadPlacement?.trim() || "Lower back",
+    goal: ["relaxation", "activation", "recovery", "reset"].includes(p.goal)
+      ? p.goal
+      : "recovery",
+    intensity: ["gentle", "moderate", "intense"].includes(p.intensity)
+      ? p.intensity
+      : "moderate",
+    sessionDurationMinutes: Number.isFinite(Number(p.sessionDurationMinutes))
+      ? Number(p.sessionDurationMinutes)
+      : 9,
+    primaryFinding: p.primaryFinding?.trim() || "Protocol generated from the available assessment.",
+    reasoning: p.reasoning?.trim() || "Fallback reasoning used because the response was incomplete.",
+    asymmetryNote: p.asymmetryNote?.trim() || null,
+    coachingTip: p.coachingTip?.trim() || "Keep movement gentle between visits.",
+    recoveryFocus: p.recoveryFocus?.trim() || "Re-test the main ROM area next visit.",
+  };
+}
 // ─── APP ──────────────────────────────────────────────────────────────────────
 function MainApp() {
+  const [sessionMode, setSessionMode] = useState("auto");
   const C = {
   root: {
     fontFamily: "Inter, sans-serif",
@@ -1101,7 +1172,13 @@ function MainApp() {
 
   const [screen,  setScreen]  = useState("camera");
   const [showCfg, setShowCfg] = useState(false);
-  const [api,     setApi]     = useState({serverUrl:"",deviceMac:"74:4D:BD:A0:A3:EC",username:"",password:"",elevenLabsKey:""});
+  const [api, setApi] = useState({
+  serverUrl: "http://54.241.236.53:8080",
+  deviceMac: "74:4D:BD:A0:A3:EC",
+  username: "testpractitioner",
+  password: "1234",
+  elevenLabsKey: ""
+});
 // Store ElevenLabs key globally so VitalsScreen can access it
   useEffect(() => { window.__elevenLabsKey = api.elevenLabsKey; }, [api.elevenLabsKey]);
   const [pt,      setPt]      = useState({name:"",age:"",practitionerType:"physical_therapist",primaryConcern:"recovery",areas:[],mobilityScore:5,hrv:"",sleepQuality:""});
@@ -1260,8 +1337,10 @@ function MainApp() {
         visionRestrictedSide: postureAnalysis.restrictedSide,
         visionFlaggedAreas: postureAnalysis.flaggedAreas,
       } : asmtWithVitals;
-      const p=await generateProtocol(pt, asmtFull);
-      setProto(p); setScreen("protocol");
+      const raw = await generateProtocol(pt, asmtFull);
+      const p = normalizeProtocol(raw);
+      setProto(p); 
+      setScreen("protocol");
       // Auto-speak protocol summary via ElevenLabs
       if (api.elevenLabsKey) {
         setSpeaking(true);
@@ -1275,22 +1354,34 @@ function MainApp() {
 
   // ── Device control ──────────────────────────────────────────────────────────
   const lg=m=>setSess(s=>({...s,log:[...s.log,m]}));
-  const startSession=async()=>{
-    setDevErr("");
-    if(!api.serverUrl){
-      setSess(s=>({...s,status:"running",log:["[DEMO] Session started — add API credentials in Settings to control real device"]}));
-      setScreen("session"); return;
-    }
-    try{
-      lg("Authenticating...");
-      const token=await deviceLogin(api.serverUrl,api.username,api.password);
-      const cfg=buildSessionConfig(api.deviceMac,proto);
-      lg(`Auth OK. Sending to ${api.deviceMac}...`);
-      await sendMQTT(api.serverUrl,token,cfg);
-      lg(`✓ Session started on ${api.deviceMac}`);
-      setSess(s=>({...s,status:"running",token})); setScreen("session");
-    }catch(e){setDevErr(e.message);}
-  };
+  const startSession = async (mode = "auto") => {
+  setDevErr("");
+
+  if (!api.serverUrl) {
+    setSess(s => ({
+      ...s,
+      status: "running",
+      log: ["[DEMO] Session started — add API credentials in Settings to control real device"],
+    }));
+    setScreen("session");
+    return;
+  }
+
+  try {
+    lg("Authenticating...");
+    const token = await deviceLogin(api.serverUrl, api.username, api.password);
+    const cfg = buildSessionConfig(api.deviceMac, proto, mode);
+
+    lg(`Auth OK. Sending to ${api.deviceMac}...`);
+    await sendMQTT(api.serverUrl, token, cfg);
+
+    lg(`✓ Session started on ${api.deviceMac}`);
+    setSess(s => ({ ...s, status: "running", token }));
+    setScreen("session");
+  } catch (e) {
+    setDevErr(e.message);
+  }
+};
   const pauseResume=async()=>{
     const p=sess.status==="paused";
     if(api.serverUrl&&sess.token){try{await sendMQTT(api.serverUrl,sess.token,{mac:api.deviceMac,playCmd:p?4:2});}catch(_){}}
@@ -1743,14 +1834,38 @@ function MainApp() {
             </div>
           )}
 
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:"1.25rem"}}>
-            {[["Goal",proto.goal],["Intensity",proto.intensity],["Duration",`${proto.sessionDurationMinutes} min`]].map(([l,v])=>(
-              <div key={l} style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"1rem",textAlign:"center"}}>
-                <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:4}}>{l}</div>
-                <div style={{fontSize:15,fontWeight:500,textTransform:"capitalize"}}>{v}</div>
-              </div>
-            ))}
-          </div>
+          <div style={{
+  display:"grid",
+  gridTemplateColumns:"repeat(3,1fr)",
+  gap:10,
+  marginBottom:"1.25rem"
+}}>
+
+  {/* Goal */}
+  <div style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"1rem",textAlign:"center"}}>
+    <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:4}}>Goal</div>
+    <div style={{fontSize:15,fontWeight:500,textTransform:"capitalize"}}>
+      {proto.goal || "recovery"}
+    </div>
+  </div>
+
+  {/* Intensity */}
+  <div style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"1rem",textAlign:"center"}}>
+    <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:4}}>Intensity</div>
+    <div style={{fontSize:15,fontWeight:500,textTransform:"capitalize"}}>
+      {proto.intensity || "moderate"}
+    </div>
+  </div>
+
+  {/* Duration */}
+  <div style={{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:"1rem",textAlign:"center"}}>
+    <div style={{fontSize:11,color:"var(--color-text-secondary)",marginBottom:4}}>Duration</div>
+    <div style={{fontSize:15,fontWeight:500}}>
+      {(proto.sessionDurationMinutes ?? 9)} min
+    </div>
+  </div>
+
+</div>
 
           <div style={{...C.card,marginBottom:"1rem"}}>
             <div style={{marginBottom:"1rem",paddingBottom:"1rem",borderBottom:"0.5px solid var(--color-border-tertiary)"}}>
@@ -1800,26 +1915,27 @@ function MainApp() {
           {devErr&&<div style={{color:"var(--color-text-danger)",fontSize:13,marginBottom:12}}>{devErr}</div>}
 
           {/* Voice + Vision summary bar */}
-          <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-            {api.elevenLabsKey && (
-              <button
-                style={{...C.ghost,flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
-                onClick={async()=>{setSpeaking(true);await speak(buildSpeechText(pt,proto),api.elevenLabsKey);setSpeaking(false);}}
-                disabled={speaking}
-              >
-                {speaking ? "🔊 Speaking..." : "🔊 Read Protocol Aloud"}
-              </button>
-            )}
-            {postureAnalysis && (
-              <div style={{...C.sec,flex:2,padding:"8px 12px",borderLeft:"3px solid #A78BFA"}}>
-                <div style={{fontSize:10,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:2,letterSpacing:"0.06em"}}>VISION ANALYSIS INCLUDED</div>
-                <div style={{fontSize:12}}>{postureAnalysis.restrictedSide !== "balanced" ? `${postureAnalysis.restrictedSide} side more restricted` : "Balanced posture detected"}</div>
-              </div>
-            )}
-          </div>
+         <div style={{ display: "flex", gap: 10 }}>
+  <button
+    style={{ ...C.prim, flex: 1 }}
+    onClick={() => startSession("auto")}
+  >
+    Start AI Session ↗
+  </button>
 
-          <button style={C.prim} onClick={startSession}>{api.serverUrl?"Start Session on Device ↗":"Start Session (Demo Mode) ↗"}</button>
-        </div>
+  <button
+    style={{
+      ...C.ghost,
+      flex: 1,
+      background: "linear-gradient(135deg,#ef4444,#3b82f6)",
+      color: "#fff",
+      fontWeight: 600
+    }}
+    onClick={() => startSession("redBlue10")}
+  >
+    10 Min Red + Blue ↗
+  </button>
+</div>       </div>
       )}
 
 
