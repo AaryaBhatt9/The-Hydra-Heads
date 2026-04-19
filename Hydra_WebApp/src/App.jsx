@@ -889,10 +889,15 @@ function resizeBase64(base64, maxWidth=512) {
       const scale = Math.min(1, maxWidth / img.width);
       const w = Math.round(img.width * scale);
       const h = Math.round(img.height * scale);
-      const c = document.createElement("canvas");
-      c.width = w; c.height = h;
-      c.getContext("2d").drawImage(img, 0, 0, w, h);
-      res(c.toDataURL("image/jpeg", 0.7).split(",")[1]);
+
+      const p = document.createElement("canvas");   // ✅ ADD THIS
+      p.width = w;
+      p.height = h;
+
+      const ctx = p.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+
+      res(p.toDataURL("image/jpeg", 0.7).split(",")[1]);
     };
     img.src = "data:image/jpeg;base64," + base64;
   });
@@ -966,12 +971,138 @@ const CONCERNS=[{value:"muscle_tension",label:"Muscle Tension / Guarding"},{valu
 const TOTAL=540;
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
-export default function App() {
+function MainApp() {
+  const C = {
+  root: {
+    fontFamily: "Inter, sans-serif",
+    color: "#e2e8f0",
+    maxWidth: 1180,
+    width: "100%",
+    margin: "0 auto",
+    padding: "20px",
+    background: "radial-gradient(circle at top, #0f172a, #020617)",
+    minHeight: "100vh",
+  },
+
+  hdr: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "16px 20px",
+    borderRadius: "20px",
+    background: "rgba(255,255,255,0.05)",
+    backdropFilter: "blur(14px)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    boxShadow: "0 10px 40px rgba(0,0,0,0.4)",
+    marginBottom: "20px",
+  },
+
+  nav: {
+    display: "flex",
+    gap: 8,
+    padding: 6,
+    borderRadius: "16px",
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    marginBottom: "20px",
+  },
+
+  tab: (active) => ({
+    flex: 1,
+    padding: "12px",
+    borderRadius: "999px",
+    background: active
+      ? "linear-gradient(135deg,#22d3ee,#8b5cf6)"
+      : "transparent",
+    color: active ? "#fff" : "#94a3b8",
+    fontWeight: 600,
+    fontSize: 12,
+    border: "none",
+    cursor: "pointer",
+    transition: "all 0.25s ease",
+    transform: active ? "scale(1.05)" : "scale(1)",
+  }),
+
+  card: {
+    background: "rgba(255,255,255,0.05)",
+    borderRadius: "22px",
+    padding: "20px",
+    border: "1px solid rgba(255,255,255,0.08)",
+    backdropFilter: "blur(16px)",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+    transition: "all 0.3s ease",
+  },
+
+  sec: {
+    background: "rgba(255,255,255,0.03)",
+    borderRadius: "18px",
+    padding: "18px",
+    border: "1px solid rgba(255,255,255,0.06)",
+  },
+
+  lbl: {
+    fontSize: 13,
+    color: "#94a3b8",
+    marginBottom: 6,
+    display: "block",
+  },
+
+  fld: {
+    marginBottom: "18px",
+  },
+
+  chip: (active) => ({
+    padding: "8px 14px",
+    borderRadius: "999px",
+    background: active
+      ? "linear-gradient(135deg,#22d3ee,#8b5cf6)"
+      : "rgba(255,255,255,0.05)",
+    color: active ? "#fff" : "#94a3b8",
+    border: active
+      ? "none"
+      : "1px solid rgba(255,255,255,0.08)",
+    cursor: "pointer",
+    fontSize: 12,
+    transition: "all 0.2s ease",
+  }),
+
+  prim: {
+    padding: "14px",
+    borderRadius: "16px",
+    background: "linear-gradient(135deg,#22d3ee,#8b5cf6)",
+    color: "#fff",
+    border: "none",
+    fontWeight: 700,
+    cursor: "pointer",
+    width: "100%",
+    boxShadow: "0 10px 30px rgba(34,211,238,0.3)",
+    transition: "all 0.2s ease",
+  },
+
+  ghost: {
+    padding: "12px",
+    borderRadius: "14px",
+    background: "rgba(255,255,255,0.05)",
+    border: "1px solid rgba(255,255,255,0.1)",
+    color: "#cbd5f5",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+  },
+
+  danger: {
+    padding: "12px",
+    borderRadius: "14px",
+    background: "rgba(248,113,113,0.1)",
+    border: "1px solid rgba(248,113,113,0.3)",
+    color: "#fecaca",
+    cursor: "pointer",
+  },
+};
+
   const [screen,  setScreen]  = useState("camera");
   const [showCfg, setShowCfg] = useState(false);
   const [api,     setApi]     = useState({serverUrl:"",deviceMac:"74:4D:BD:A0:A3:EC",username:"",password:"",elevenLabsKey:""});
-
-  // Store ElevenLabs key globally so VitalsScreen can access it
+// Store ElevenLabs key globally so VitalsScreen can access it
   useEffect(() => { window.__elevenLabsKey = api.elevenLabsKey; }, [api.elevenLabsKey]);
   const [pt,      setPt]      = useState({name:"",age:"",practitionerType:"physical_therapist",primaryConcern:"recovery",areas:[],mobilityScore:5,hrv:"",sleepQuality:""});
   const [asmt,    setAsmt]    = useState(null);
@@ -1184,20 +1315,7 @@ export default function App() {
   const cur=live||asmt;
 
   // ── Shared styles ───────────────────────────────────────────────────────────
-  const C={
-    root:{fontFamily:"var(--font-sans)",color:"var(--color-text-primary)",maxWidth:700,margin:"0 auto",padding:"0 0 2rem"},
-    hdr:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"1rem 0 1.25rem",borderBottom:"0.5px solid var(--color-border-tertiary)",marginBottom:"1.5rem"},
-    nav:{display:"flex",gap:3,background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-md)",padding:3,marginBottom:"1.5rem"},
-    tab:a=>({flex:1,padding:"7px 6px",border:a?"0.5px solid var(--color-border-secondary)":"0.5px solid transparent",borderRadius:5,background:a?"var(--color-background-primary)":"transparent",color:a?"var(--color-text-primary)":"var(--color-text-secondary)",fontSize:12,fontWeight:a?500:400,cursor:"pointer"}),
-    card:{background:"var(--color-background-primary)",borderRadius:"var(--border-radius-lg)",border:"0.5px solid var(--color-border-tertiary)",padding:"1.25rem"},
-    sec:{background:"var(--color-background-secondary)",borderRadius:"var(--border-radius-lg)",border:"0.5px solid var(--color-border-tertiary)",padding:"1.25rem"},
-    lbl:{display:"block",fontSize:13,color:"var(--color-text-secondary)",fontWeight:500,marginBottom:6},
-    fld:{marginBottom:"1.25rem"},
-    chip:on=>({padding:"7px 12px",borderRadius:"var(--border-radius-md)",border:on?"1.5px solid #E24B4A":"0.5px solid var(--color-border-tertiary)",background:on?"#FCEBEB":"var(--color-background-secondary)",color:on?"#791F1F":"var(--color-text-secondary)",fontSize:13,fontWeight:on?500:400,cursor:"pointer"}),
-    prim:{padding:"12px 20px",background:"var(--color-text-primary)",color:"var(--color-background-primary)",borderRadius:"var(--border-radius-md)",border:"none",cursor:"pointer",fontSize:14,fontWeight:500,width:"100%"},
-    ghost:{padding:"9px 18px",borderRadius:"var(--border-radius-md)",border:"0.5px solid var(--color-border-secondary)",background:"none",cursor:"pointer",fontSize:13,color:"var(--color-text-secondary)"},
-    danger:{padding:"9px 18px",borderRadius:"var(--border-radius-md)",border:"0.5px solid var(--color-border-danger)",background:"none",cursor:"pointer",fontSize:13,color:"var(--color-text-danger)"},
-  };
+
 
   const TABS=[
     {id:"camera",   label:"0  Assess"},
@@ -1239,11 +1357,83 @@ export default function App() {
       )}
 
       {/* ── Nav ── */}
-      <div style={C.nav}>
-        {TABS.map(t=>(
-          <button key={t.id} style={C.tab(screen===t.id)} onClick={()=>!t.locked&&setScreen(t.id)} disabled={t.locked}>{t.label}</button>
-        ))}
+      <div style={{
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginBottom: "1.5rem",
+  position: "relative"
+}}>
+
+  {/* Progress line */}
+  <div style={{
+    position: "absolute",
+    top: "50%",
+    left: 0,
+    right: 0,
+    height: 2,
+    background: "rgba(255,255,255,0.1)",
+    transform: "translateY(-50%)",
+    zIndex: 0
+  }} />
+
+  {TABS.map((t, i) => {
+    const active = screen === t.id;
+
+    return (
+      <div
+        key={t.id}
+        onClick={() => !t.locked && setScreen(t.id)}
+        style={{
+          zIndex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          cursor: t.locked ? "not-allowed" : "pointer",
+          flex: 1,
+          transition: "all 0.3s ease"
+        }}
+      >
+        {/* Circle */}
+        <div style={{
+          width: 38,
+          height: 38,
+          borderRadius: "50%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 13,
+          fontWeight: 600,
+          color: active ? "#020617" : "#94a3b8",
+          background: active
+            ? "linear-gradient(135deg,#22d3ee,#8b5cf6)"
+            : "rgba(255,255,255,0.05)",
+          boxShadow: active
+            ? "0 0 20px rgba(139,92,246,0.6)"
+            : "none",
+          border: active
+            ? "none"
+            : "1px solid rgba(255,255,255,0.1)",
+          transition: "all 0.3s ease"
+        }}>
+          {i}
+        </div>
+
+        {/* Label */}
+        <div style={{
+          marginTop: 6,
+          fontSize: 11,
+          color: active ? "#fff" : "#64748b",
+          fontWeight: active ? 600 : 400,
+          textAlign: "center",
+          transition: "all 0.3s"
+        }}>
+          {t.label.split(" ")[1]}
+        </div>
       </div>
+    );
+  })}
+</div>
 
 
       {/* ════════════════════════════════
@@ -1755,3 +1945,158 @@ export default function App() {
     </div>
   );
 }
+
+function Landing({ onEnter }) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background:
+          "radial-gradient(circle at 20% 30%, #0ea5e9 0%, transparent 40%), radial-gradient(circle at 80% 70%, #8b5cf6 0%, transparent 40%), #020617",
+        color: "#fff",
+        fontFamily: "var(--font-sans)",
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
+      {/* Glow Orbs */}
+      <div
+        style={{
+          position: "absolute",
+          width: 400,
+          height: 400,
+          borderRadius: "50%",
+          background: "rgba(34,211,238,0.15)",
+          filter: "blur(120px)",
+          top: "-100px",
+          left: "-100px",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          width: 400,
+          height: 400,
+          borderRadius: "50%",
+          background: "rgba(139,92,246,0.2)",
+          filter: "blur(120px)",
+          bottom: "-100px",
+          right: "-100px",
+        }}
+      />
+
+      {/* Main Card */}
+      <div
+        style={{
+          backdropFilter: "blur(25px)",
+          background: "rgba(255,255,255,0.06)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: 28,
+          padding: "3rem 2.5rem",
+          width: 420,
+          textAlign: "center",
+          boxShadow: "0 30px 80px rgba(0,0,0,0.4)",
+          animation: "fadeIn 0.8s ease",
+        }}
+      >
+        {/* Badge */}
+        <div
+          style={{
+            display: "inline-block",
+            padding: "6px 14px",
+            borderRadius: 999,
+            background: "rgba(255,255,255,0.08)",
+            fontSize: 12,
+            marginBottom: 18,
+            letterSpacing: "0.08em",
+          }}
+        >
+          HYDRA HEADS
+        </div>
+
+        {/* Title */}
+        <h1
+          style={{
+            fontSize: 30,
+            fontWeight: 700,
+            marginBottom: 12,
+            letterSpacing: "-0.5px",
+          }}
+        >
+          Hydrawav3
+        </h1>
+
+        {/* Subtitle */}
+        <p
+          style={{
+            fontSize: 14,
+            color: "#cbd5e1",
+            marginBottom: 28,
+            lineHeight: 1.6,
+          }}
+        >
+          AI-powered recovery intelligence using camera, vitals, and smart
+          protocol generation.
+        </p>
+
+        {/* CTA Button */}
+        <button
+          onClick={onEnter}
+          style={{
+            width: "100%",
+            padding: "14px",
+            borderRadius: 16,
+            border: "none",
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: "pointer",
+            background:
+              "linear-gradient(135deg, #22d3ee 0%, #8b5cf6 100%)",
+            color: "#fff",
+            boxShadow: "0 15px 40px rgba(34,211,238,0.3)",
+            transition: "all 0.25s ease",
+          }}
+          onMouseEnter={(e) =>
+            (e.target.style.transform = "scale(1.05)")
+          }
+          onMouseLeave={(e) =>
+            (e.target.style.transform = "scale(1)")
+          }
+        >
+          Enter Dashboard →
+        </button>
+      </div>
+
+      {/* Animation */}
+      <style>
+        {`
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}
+      </style>
+    </div>
+  );
+}
+
+export default function App() {
+  const [view, setView] = useState("landing");
+
+  return view === "landing" ? (
+    <Landing onEnter={() => setView("app")} />
+  ) : (
+    <>
+      <button className="back-home-btn" onClick={() => setView("landing")}>
+        ← Back to Landing
+      </button>
+      <MainApp />
+    </>
+  );
+
+}
+
+
