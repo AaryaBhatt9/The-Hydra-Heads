@@ -764,7 +764,14 @@ function VitalsScreen({onVitalsCaptured,C}){
 }
 
 // ─── VOICE INPUT (browser Web Speech API — FREE, no key needed) ──────────────
-// Works in Chrome, Edge, Safari. Firefox needs a flag enabled.
+// Click to start recording, click again to stop. Shows live transcript.
+// Works in Chrome, Edge, Safari.
+if (!document.getElementById("hw3-mic-style")) {
+  const st = document.createElement("style");
+  st.id = "hw3-mic-style";
+  st.textContent = `@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 #E24B4A40} 50%{box-shadow:0 0 0 6px #E24B4A00} }`;
+  document.head.appendChild(st);
+}
 function useVoiceInput(onResult) {
   const recogRef = useRef(null);
   const [listening, setListening] = useState(false);
@@ -778,14 +785,16 @@ function useVoiceInput(onResult) {
     r.lang = "en-US";
     r.interimResults = true;
     r.maxAlternatives = 1;
-    r.continuous = false;
+    r.continuous = true;        // keep recording until user clicks stop
     r.onstart  = () => setListening(true);
     r.onend    = () => setListening(false);
     r.onerror  = () => setListening(false);
     r.onresult = (e) => {
       const text = Array.from(e.results).map(r => r[0].transcript).join("");
       setTranscript(text);
-      if (e.results[e.results.length - 1].isFinal) onResult(text);
+      // Update in real time — final result fires when user stops
+      const last = e.results[e.results.length - 1];
+      if (last.isFinal) onResult(text);
     };
     recogRef.current = r;
     r.start();
@@ -796,30 +805,49 @@ function useVoiceInput(onResult) {
     setListening(false);
   }, []);
 
-  return { listening, transcript, supported, start, stop };
+  const toggle = useCallback(() => {
+    if (listening) stop(); else start();
+  }, [listening, start, stop]);
+
+  return { listening, transcript, supported, toggle, stop };
 }
 
-// Mic button component
+// Mic button — click to start, click again to stop
 function MicButton({ onResult, style = {} }) {
-  const { listening, transcript, supported, start, stop } = useVoiceInput(onResult);
+  const { listening, transcript, supported, toggle } = useVoiceInput(onResult);
   if (!supported) return null;
   return (
-    <button
-      onMouseDown={start} onMouseUp={stop}
-      onTouchStart={start} onTouchEnd={stop}
-      onClick={e => e.preventDefault()}
-      title="Hold to speak"
-      style={{
-        padding: "8px 10px", borderRadius: "var(--border-radius-md)",
-        border: `1.5px solid ${listening ? "#E24B4A" : "var(--color-border-secondary)"}`,
-        background: listening ? "#FCEBEB" : "var(--color-background-secondary)",
-        cursor: "pointer", fontSize: 16, lineHeight: 1,
-        transition: "all 0.15s", flexShrink: 0,
-        ...style
-      }}
-    >
-      {listening ? "🔴" : "🎙"}
-    </button>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+      <button
+        onClick={toggle}
+        title={listening ? "Click to stop" : "Click to start speaking"}
+        style={{
+          padding: "8px 12px",
+          borderRadius: "var(--border-radius-md)",
+          border: `1.5px solid ${listening ? "#E24B4A" : "var(--color-border-secondary)"}`,
+          background: listening ? "#FCEBEB" : "var(--color-background-secondary)",
+          cursor: "pointer",
+          fontSize: 16,
+          lineHeight: 1,
+          transition: "all 0.15s",
+          flexShrink: 0,
+          animation: listening ? "pulse 1s ease-in-out infinite" : "none",
+          ...style,
+        }}
+      >
+        {listening ? "🔴" : "🎙"}
+      </button>
+      {listening && transcript && (
+        <div style={{
+          fontSize: 11, color: "#791F1F",
+          background: "#FCEBEB", borderRadius: 6,
+          padding: "3px 8px", maxWidth: 200,
+          textAlign: "center", lineHeight: 1.4,
+        }}>
+          {transcript.slice(-60)}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1462,7 +1490,7 @@ export default function App() {
             <div style={{...C.sec,marginBottom:12,padding:"0.875rem 1rem"}}>
               <div style={{fontSize:12,fontWeight:500,color:"var(--color-text-secondary)",marginBottom:6}}>VOICE QUICK-FILL</div>
               <div style={{fontSize:12,color:"var(--color-text-secondary)",marginBottom:8}}>
-                Hold mic and say: <em>"My name is John, I have tightness in my left shoulder and lower back after running"</em>
+                Click mic → speak → click again to stop: <em>"My name is John, I have tightness in my left shoulder and lower back after running"</em>
               </div>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <MicButton
@@ -1490,7 +1518,7 @@ export default function App() {
                     } catch(_) {}
                   }}
                 />
-                <div style={{fontSize:13,color:"var(--color-text-secondary)"}}>Hold to speak · releases to auto-fill fields</div>
+                <div style={{fontSize:13,color:"var(--color-text-secondary)"}}>Click to start · click again to stop · auto-fills fields</div>
               </div>
             </div>
 
