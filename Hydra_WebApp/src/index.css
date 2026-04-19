@@ -1,0 +1,21 @@
+:root {
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: dark;
+  color: #f8fafc;
+  background: #020617;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; width: 100%; min-height: 100vh; color: #f8fafc; background: #020617; }
+#root { width: 100%; min-height: 100vh; display: flex; flex-direction: column; color: #f8fafc; }
+h1, h2, h3, h4, h5, h6 { color: #ffffff; margin: 0 0 8px; }
+h1 { font-size: 56px; font-weight: 500; letter-spacing: -1.68px; margin: 32px 0; }
+h2 { font-size: 24px; line-height: 118%; letter-spacing: -0.24px; }
+p { margin: 0; }
+code { font-family: var(--mono); font-size: 15px; line-height: 135%; padding: 4px 8px; background: rgba(255,255,255,0.08); color: #f8fafc; border-radius: 4px; display: inline-flex; }

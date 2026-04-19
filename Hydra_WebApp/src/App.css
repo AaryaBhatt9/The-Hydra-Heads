@@ -1,0 +1,131 @@
+:root {
+  --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Always dark — app background is always deep navy */
+  --color-background-primary: rgba(255, 255, 255, 0.06);
+  --color-background-secondary: rgba(255, 255, 255, 0.04);
+  --color-background-tertiary: rgba(255, 255, 255, 0.08);
+
+  /* Always white text — regardless of system light/dark mode */
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-text-success: #86efac;
+  --color-text-danger: #fca5a5;
+
+  --color-border-primary: rgba(255, 255, 255, 0.10);
+  --color-border-secondary: rgba(255, 255, 255, 0.14);
+  --color-border-tertiary: rgba(255, 255, 255, 0.08);
+  --color-border-danger: rgba(248, 113, 113, 0.28);
+
+  --border-radius-md: 14px;
+  --border-radius-lg: 22px;
+  --border-radius-xl: 28px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Force white text on all elements — overrides index.css dark/light mode */
+html, body, #root {
+  color: #f8fafc;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #ffffff !important;
+}
+
+p, span, div, label {
+  color: inherit;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: var(--font-sans);
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at top, rgba(34, 211, 238, 0.18), transparent 30%),
+    radial-gradient(circle at right, rgba(167, 139, 250, 0.14), transparent 25%),
+    linear-gradient(180deg, #020617 0%, #0f172a 48%, #111827 100%);
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+  color: #f8fafc;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(34, 211, 238, 0.65);
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.12);
+}
+
+/* Select option text fix for light mode OS */
+select option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.back-home-btn {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 999;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(2, 6, 23, 0.75);
+  color: #fff;
+  backdrop-filter: blur(16px);
+  cursor: pointer;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.screen {
+  opacity: 0;
+  transform: translateY(25px);
+  transition: all 0.4s ease;
+  pointer-events: none;
+}
+
+.screen.active {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}

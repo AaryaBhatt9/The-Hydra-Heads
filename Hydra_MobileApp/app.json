@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Hydrawav3",
+    "slug": "hydrawav3-mobile1",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#070B0F"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hydrawav3.recovery",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used for body movement assessment and ROM analysis.",
+        "NSMicrophoneUsageDescription": "Required by camera."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.hydrawav3.recovery",
+      "permissions": ["CAMERA"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      ["expo-camera", {
+        "cameraPermission": "Allow Hydrawav3 to access your camera for body assessment."
+      }]
+    ]
+  }
+}
