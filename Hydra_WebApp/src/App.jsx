@@ -17,7 +17,7 @@
  * Tools: MediaPipe Pose (CDN), OpenCV approach via canvas
  */
 import { useState, useEffect, useRef, useCallback } from "react";
-
+import { jsPDF } from "jspdf";
 // ─── MEDIAPIPE LANDMARK INDICES ───────────────────────────────────────────────
 const LM = {
   NOSE:0,LEFT_SHOULDER:11,RIGHT_SHOULDER:12,LEFT_ELBOW:13,RIGHT_ELBOW:14,
@@ -1069,6 +1069,7 @@ const [reportPreview, setReportPreview] = useState(null);
 const [reportErr, setReportErr] = useState("");
 const uploadRef = useRef(null);
   const [sessionMode, setSessionMode] = useState("auto");
+  
   const C = {
   root: {
     fontFamily: "Inter, sans-serif",
@@ -1467,73 +1468,103 @@ const uploadRef = useRef(null);
 
   reader.readAsText(file);
 };
-const downloadReportPdf = async () => {
-  if (!reportRef.current) return;
-
-  const html2canvas = (await import("html2canvas")).default;
-  const { jsPDF } = await import("jspdf");
-
-  const canvas = await html2canvas(reportRef.current, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: "#020617",
-  });
-
-  const imgData = canvas.toDataURL("image/png");
+const downloadReportPdf = () => {
+  const r = reportPreview;
+  if (!r) return;
   const pdf = new jsPDF("p", "mm", "a4");
-
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-  let heightLeft = imgHeight;
-  let position = 0;
-
-  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
-
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-  }
-
-  pdf.save(`${reportPreview?.patientName || "Hydrawav3"}-report.pdf`);
+  const W = 210, margin = 18, contentW = 210 - 36;
+  let y = 0;
+  const nl = (h=6) => { y+=h; if(y>270){pdf.addPage();y=20;} };
+  const txt = (s,x,sz=11,st="normal",col=[30,30,30]) => { pdf.setFontSize(sz);pdf.setFont("helvetica",st);pdf.setTextColor(...col);pdf.text(String(s||""),x,y); };
+  const rule = () => { pdf.setDrawColor(220,220,220);pdf.setLineWidth(0.3);pdf.line(margin,y,W-margin,y);nl(5); };
+  const badge = (label,value,x,w) => { pdf.setFillColor(245,247,250);pdf.setDrawColor(210,215,225);pdf.roundedRect(x,y-5,w,14,2,2,"FD");pdf.setFontSize(8);pdf.setFont("helvetica","normal");pdf.setTextColor(120,120,130);pdf.text(label.toUpperCase(),x+4,y);pdf.setFontSize(12);pdf.setFont("helvetica","bold");pdf.setTextColor(30,30,30);pdf.text(String(value||"—"),x+4,y+6); };
+  const sec = (title) => { nl(4);pdf.setFillColor(240,244,255);pdf.rect(margin,y-4,contentW,9,"F");txt(title,margin+3,9,"bold",[50,80,160]);nl(7); };
+  const body = (s,ind=0) => { pdf.splitTextToSize(String(s||""),contentW-ind).forEach(l=>{txt(l,margin+ind,10,"normal",[60,60,70]);nl(5.5);}); };
+  const kv = (k,v) => { txt(k+":",margin,9,"bold",[80,80,90]);txt(String(v||"—"),margin+48,9,"normal",[40,40,50]);nl(6); };
+  // Header
+  y=24; pdf.setFillColor(15,23,42);pdf.rect(0,0,W,18,"F");pdf.setFillColor(34,211,238);pdf.rect(0,0,4,18,"F");
+  pdf.setFontSize(13);pdf.setFont("helvetica","bold");pdf.setTextColor(255,255,255);pdf.text("HYDRAWAV3",margin,11);
+  pdf.setFontSize(8);pdf.setFont("helvetica","normal");pdf.setTextColor(150,200,220);pdf.text("Recovery Intelligence Report",margin+44,11);
+  pdf.setFontSize(8);pdf.setTextColor(120,150,160);pdf.text(new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"}),W-margin,11,{align:"right"});
+  // Patient
+  y=30; txt(r.merged.patient.name||"Report",margin,20,"bold",[15,23,42]);nl(9);
+  pdf.setFontSize(10);pdf.setFont("helvetica","normal");pdf.setTextColor(100,100,100);
+  pdf.text(`Age ${r.merged.patient.age||"n/a"} · Mobility ${r.merged.patient.mobilityScore||"n/a"}/10`,W-margin,y,{align:"right"});
+  nl(4); rule();
+  // Badges
+  const bw=(contentW-8)/3;
+  badge("Session Goal",r.merged.protocol.goal,margin,bw);
+  badge("Intensity",r.merged.protocol.intensity,margin+bw+4,bw);
+  badge("Duration",`${r.merged.protocol.sessionDurationMinutes||9} min`,margin+(bw+4)*2,bw);
+  nl(16); rule();
+  // Pad placement
+  sec("Pad Placement");
+  const hw=(contentW-6)/2;
+  pdf.setFillColor(255,243,235);pdf.setDrawColor(240,160,100);pdf.roundedRect(margin,y-5,hw,18,2,2,"FD");
+  pdf.setFontSize(7);pdf.setFont("helvetica","bold");pdf.setTextColor(150,70,20);pdf.text("SUN PAD — HEAT + RED 660nm",margin+3,y);
+  pdf.setFontSize(11);pdf.setFont("helvetica","bold");pdf.setTextColor(100,40,10);pdf.text(r.merged.protocol.sunPadPlacement||"—",margin+3,y+8);
+  pdf.setFillColor(235,242,255);pdf.setDrawColor(100,150,220);pdf.roundedRect(margin+hw+6,y-5,hw,18,2,2,"FD");
+  pdf.setFontSize(7);pdf.setFont("helvetica","bold");pdf.setTextColor(30,70,150);pdf.text("MOON PAD — COOL + BLUE 450nm",margin+hw+9,y);
+  pdf.setFontSize(11);pdf.setFont("helvetica","bold");pdf.setTextColor(10,40,100);pdf.text(r.merged.protocol.moonPadPlacement||"—",margin+hw+9,y+8);
+  nl(20);
+  // Vitals
+  sec("Vitals");
+  const vbw=(contentW-8)/3;
+  badge("Heart Rate",r.merged.vitals.heartRate?`${r.merged.vitals.heartRate} bpm`:"—",margin,vbw);
+  badge("Breath Rate",r.merged.vitals.breathRate?`${r.merged.vitals.breathRate}/min`:"—",margin+vbw+4,vbw);
+  badge("HRV",r.merged.vitals.hrv?`${r.merged.vitals.hrv} ms`:"—",margin+(vbw+4)*2,vbw);
+  nl(16);
+  // Sections
+  sec("Summary"); body(r.summary);
+  if(r.merged.patient.areas?.length){sec("Focus Areas");body(r.merged.patient.areas.join(" · "));}
+  sec("Protocol"); kv("Sun Pad",r.merged.protocol.sunPadPlacement); kv("Moon Pad",r.merged.protocol.moonPadPlacement);
+  sec("Recommendations"); kv("Coaching Tip",r.recommendations.coachingTip); nl(2); kv("Retest",r.recommendations.recoveryFocus);
+  if(r.merged.uploadedData){sec("Uploaded Dataset");body(JSON.stringify(r.merged.uploadedData,null,2).slice(0,800)+"...");}
+  // Footer
+  const tp=pdf.internal.getNumberOfPages();
+  for(let i=1;i<=tp;i++){pdf.setPage(i);pdf.setFillColor(245,247,250);pdf.rect(0,285,W,12,"F");pdf.setFontSize(8);pdf.setFont("helvetica","normal");pdf.setTextColor(140,140,160);pdf.text("Hydrawav3 · Recovery Intelligence · GlobeHack S1 · Wellness use only",margin,292);pdf.text(`Page ${i} of ${tp}`,W-margin,292,{align:"right"});}
+  pdf.save(`${r.merged.patient.name||"hydrawav3"}-report.pdf`);
 };
+
 const generateReport = () => {
-  const report = {
-    patientName: pt.name || uploadedData?.patient?.name || "Unknown",
-    age: pt.age || uploadedData?.patient?.age || "n/a",
-    goal: proto?.goal || uploadedData?.protocol?.goal || "recovery",
-    intensity: proto?.intensity || uploadedData?.protocol?.intensity || "moderate",
-    duration: proto?.sessionDurationMinutes ?? uploadedData?.protocol?.sessionDurationMinutes ?? 9,
-    summary: [
-      asmt ? `Camera assessment collected with ${asmt.flags?.length || 0} flags.` : "No live camera assessment.",
-      vitals ? `Vitals: HR ${vitals.heartRate || "n/a"}, Breath ${vitals.breathRate || "n/a"}, HRV ${vitals.hrv || "n/a"}.` : "No live vitals captured.",
-      proto ? `Protocol generated with sun pad at ${proto.sunPadPlacement} and moon pad at ${proto.moonPadPlacement}.` : "No protocol generated yet.",
-      sess?.status ? `Session status: ${sess.status}.` : "",
-      rec?.notes ? `Practitioner notes: ${rec.notes}` : "",
-      uploadedData ? "Manual dataset upload included." : "",
-    ].filter(Boolean).join(" "),
+  const merged = {
+    patient: {
+      name: pt.name || uploadedData?.patient?.name || "Unknown",
+      age: pt.age || uploadedData?.patient?.age || "n/a",
+      areas: pt.areas?.length ? pt.areas : uploadedData?.patient?.areas || [],
+      mobilityScore: pt.mobilityScore || uploadedData?.patient?.mobilityScore || 5,
+    },
+    vitals: {
+      heartRate: vitals?.heartRate || uploadedData?.vitals?.heartRate || null,
+      breathRate: vitals?.breathRate || uploadedData?.vitals?.breathRate || null,
+      hrv: vitals?.hrv || uploadedData?.vitals?.hrv || null,
+    },
+    protocol: {
+      goal: proto?.goal || uploadedData?.protocol?.goal || "recovery",
+      intensity: proto?.intensity || uploadedData?.protocol?.intensity || "moderate",
+      sessionDurationMinutes:
+        proto?.sessionDurationMinutes ?? uploadedData?.protocol?.sessionDurationMinutes ?? 9,
+      sunPadPlacement: proto?.sunPadPlacement || uploadedData?.protocol?.sunPadPlacement || "Upper back",
+      moonPadPlacement: proto?.moonPadPlacement || uploadedData?.protocol?.moonPadPlacement || "Lower back",
+    },
+    uploadedData,
+  };
+
+  const summary = [
+    asmt ? `Camera assessment collected with ${asmt.flags?.length || 0} flags.` : "No live camera assessment.",
+    vitals ? `Vitals captured: HR ${vitals.heartRate || "n/a"}, Breath ${vitals.breathRate || "n/a"}, HRV ${vitals.hrv || "n/a"}.` : "No live vitals captured.",
+    proto ? `Protocol generated with sun pad at ${proto.sunPadPlacement} and moon pad at ${proto.moonPadPlacement}.` : "No protocol generated yet.",
+    uploadedData ? "Manual dataset upload merged into report." : "No manual dataset uploaded.",
+  ].join(" ");
+
+  setReportPreview({
+    merged,
+    summary,
     recommendations: {
       coachingTip: proto?.coachingTip || "Keep movement gentle between visits.",
       recoveryFocus: proto?.recoveryFocus || "Re-test the main ROM area next visit.",
     },
-    raw: {
-      patient: pt,
-      assessment: asmt,
-      vitals,
-      protocol: proto,
-      session: sess,
-      recovery: rec,
-      uploadedData,
-    },
-  };
-
-  setReportPreview(report);
+  });
   setScreen("report");
 };
 
@@ -1548,128 +1579,6 @@ const generateReport = () => {
         </div>
         <button style={C.ghost} onClick={()=>setShowCfg(v=>!v)}>{showCfg?"Close":"Settings"}</button>
       </div>
-      {screen === "report" && reportPreview && (
-  <div>
-    <div style={{ marginBottom: "1.5rem" }}>
-      <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 4 }}>
-        Final Report
-      </div>
-      <div style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>
-        Live data + manual upload merged into one clinical-style summary
-      </div>
-    </div>
-
-    <div
-      ref={reportRef}
-      style={{
-        background: "linear-gradient(180deg, rgba(15,23,42,0.95), rgba(2,6,23,0.98))",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: 24,
-        padding: 24,
-        boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
-        <div>
-          <div style={{ fontSize: 12, letterSpacing: "0.12em", color: "#94a3b8", marginBottom: 8 }}>
-            HYDRAWAV3 REPORT
-          </div>
-          <div style={{ fontSize: 30, fontWeight: 700, color: "#fff" }}>
-            {reportPreview.patientName}
-          </div>
-          <div style={{ fontSize: 14, color: "#cbd5e1", marginTop: 4 }}>
-            Age {reportPreview.age} · Recovery Intelligence Summary
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button style={C.ghost} onClick={() => setScreen("recovery")}>
-            Back
-          </button>
-          <button style={C.prim} onClick={downloadReportPdf}>
-            Download PDF
-          </button>
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
-        <div style={reportCardStyle}>
-          <div style={reportLabelStyle}>Goal</div>
-          <div style={reportValueStyle}>{reportPreview.merged.protocol.goal}</div>
-        </div>
-        <div style={reportCardStyle}>
-          <div style={reportLabelStyle}>Intensity</div>
-          <div style={reportValueStyle}>{reportPreview.merged.protocol.intensity}</div>
-        </div>
-        <div style={reportCardStyle}>
-          <div style={reportLabelStyle}>Duration</div>
-          <div style={reportValueStyle}>{reportPreview.merged.protocol.sessionDurationMinutes} min</div>
-        </div>
-      </div>
-
-      <div style={sectionStyle}>
-        <div style={sectionTitleStyle}>Summary</div>
-        <div style={sectionTextStyle}>{reportPreview.summary}</div>
-      </div>
-
-      <div style={{ ...sectionStyle, marginTop: 14 }}>
-        <div style={sectionTitleStyle}>Vitals</div>
-        <div style={sectionTextStyle}>
-          Heart Rate: {reportPreview.merged.vitals.heartRate} bpm ·
-          Breath Rate: {reportPreview.merged.vitals.breathRate} /min ·
-          HRV: {reportPreview.merged.vitals.hrv} ms
-        </div>
-      </div>
-
-      <div style={{ ...sectionStyle, marginTop: 14 }}>
-        <div style={sectionTitleStyle}>Protocol</div>
-        <div style={sectionTextStyle}>
-          Sun Pad: {reportPreview.merged.protocol.sunPadPlacement}<br />
-          Moon Pad: {reportPreview.merged.protocol.moonPadPlacement}
-        </div>
-      </div>
-
-      <div style={{ ...sectionStyle, marginTop: 14 }}>
-        <div style={sectionTitleStyle}>Recommendations</div>
-        <div style={sectionTextStyle}>
-          Coaching Tip: {reportPreview.recommendations.coachingTip}<br />
-          Retest: {reportPreview.recommendations.recoveryFocus}
-        </div>
-      </div>
-
-      {reportPreview.merged.uploadedData && (
-        <div style={{ ...sectionStyle, marginTop: 14 }}>
-          <div style={sectionTitleStyle}>Uploaded Dataset</div>
-          <pre style={{
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            fontSize: 12,
-            color: "#cbd5e1",
-            margin: 0,
-          }}>
-            {JSON.stringify(reportPreview.merged.uploadedData, null, 2)}
-          </pre>
-        </div>
-      )}
-    </div>
-
-    <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-      <button style={C.ghost} onClick={() => setScreen("recovery")}>
-        Back to Recovery
-      </button>
-      <button
-        style={C.prim}
-        onClick={() => {
-          setScreen("camera");
-          setReportPreview(null);
-        }}
-      >
-        New Session
-      </button>
-    </div>
-  </div>
-)}
-
       {/* ── Settings ── */}
       {showCfg&&(
         <div style={{...C.sec,marginBottom:"1.5rem"}}>
@@ -2360,7 +2269,67 @@ const generateReport = () => {
           )}
         </div>
       )}
+   {screen === "report" && reportPreview && (
+  <div>
+    <div style={{ marginBottom: "1.5rem" }}>
+      <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 4 }}>
+        Final Report
+      </div>
+      <div style={{ fontSize: 14, color: "var(--color-text-secondary)" }}>
+        Live data + manual upload merged into one report
+      </div>
+    </div>
 
+    <div ref={reportRef} style={C.card}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 12, letterSpacing: "0.12em", color: "#94a3b8", marginBottom: 6 }}>
+            HYDRAWAV3 REPORT
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#fff" }}>
+            {reportPreview.merged.patient.name}
+          </div>
+          <div style={{ fontSize: 14, color: "#cbd5e1", marginTop: 4 }}>
+            Age {reportPreview.merged.patient.age} · Recovery Intelligence Summary
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button style={C.ghost} onClick={() => setScreen("recovery")}>Back</button>
+          <button style={C.prim} onClick={downloadReportPdf}>Download PDF</button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+        {[["Goal", reportPreview.merged.protocol.goal], ["Intensity", reportPreview.merged.protocol.intensity], ["Duration", `${reportPreview.merged.protocol.sessionDurationMinutes} min`]].map(([label, val]) => (
+          <div key={label} style={{ background:"rgba(255,255,255,0.06)", borderRadius:12, padding:"12px 14px", border:"1px solid rgba(255,255,255,0.08)" }}>
+            <div style={{ fontSize:10, color:"#94a3b8", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>{label}</div>
+            <div style={{ fontSize:16, fontWeight:700, color:"#f1f5f9", textTransform:"capitalize" }}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {[
+        ["Summary",         reportPreview.summary],
+        ["Vitals",          `Heart Rate: ${reportPreview.merged.vitals.heartRate || "n/a"} bpm\nBreath Rate: ${reportPreview.merged.vitals.breathRate || "n/a"} /min\nHRV: ${reportPreview.merged.vitals.hrv || "n/a"} ms`],
+        ["Protocol",        `Goal: ${reportPreview.merged.protocol.goal}\nIntensity: ${reportPreview.merged.protocol.intensity}\nDuration: ${reportPreview.merged.protocol.sessionDurationMinutes} min\nSun Pad: ${reportPreview.merged.protocol.sunPadPlacement}\nMoon Pad: ${reportPreview.merged.protocol.moonPadPlacement}`],
+        ["Recommendations", `Coaching Tip: ${reportPreview.recommendations.coachingTip}\nRetest: ${reportPreview.recommendations.recoveryFocus}`],
+      ].map(([title, content]) => (
+        <div key={title} style={{ background:"rgba(255,255,255,0.03)", borderRadius:10, padding:"14px 16px", border:"1px solid rgba(255,255,255,0.06)", marginBottom:12 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:"#22d3ee", textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:8 }}>{title}</div>
+          <div style={{ fontSize:13, color:"#cbd5e1", lineHeight:1.8, whiteSpace:"pre-line" }}>{content}</div>
+        </div>
+      ))}
+    </div>
+
+    <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+      <button style={C.ghost} onClick={() => setScreen("recovery")}>Back</button>
+      <button style={C.prim} onClick={() => { setScreen("camera"); setReportPreview(null); }}>
+        New Session
+      </button>
+    </div>
+  </div>
+)}
     </div>
   );
 }
