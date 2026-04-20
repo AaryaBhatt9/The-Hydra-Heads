@@ -5,11 +5,13 @@
 
 **GlobeHack Season 1 · ASU April 2026 · Sponsor Track: Hydrawav3 Wellness Technology Intelligence**
 
+**Award:** Winner, TamaGrow Track
+
 ---
 
 ## 🎥 Demo
 
-> _[Add your 2-minute demo video link here — Loom / YouTube]_
+Demo video: https://youtu.be/utiUBV71CDA?si=fGlM-OMf1Q0Rf6X_
 
 ---
 
